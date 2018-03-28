@@ -21,6 +21,12 @@ typedef struct
     size_t dictionaryEntrySize[4096];
 } lzwDecompData;
 
+typedef struct
+{
+    char *buffer;
+    size_t size;
+} phrase;
+
 /* lzw decompression alglorithm
 *  Args:lzwDecompData structure, FILE source pointer and FILE dest pointer
 *  Returns:0 on success or 1 on failure

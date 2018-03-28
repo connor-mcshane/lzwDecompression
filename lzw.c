@@ -11,8 +11,10 @@
 #include <string.h>
 #include <stdbool.h>
 
+#define BUFFSIZE 1024
 
-void addToDictionary(lzwDecompData* data, char *inputStr)
+
+void addToDictionary(lzwDecompData* data, char *inputStr, size_t strSize)
 {
     /* Add string to lzwDecompdata structure
     *  Args: lzwDecompData data structure and String inputStr
@@ -20,7 +22,7 @@ void addToDictionary(lzwDecompData* data, char *inputStr)
     */
     int tempIndex = data->dictionarySize;
     data->dictionary[tempIndex] = inputStr;
-    data->dictionaryEntrySize[tempIndex] = strlen(inputStr);
+    data->dictionaryEntrySize[tempIndex] = strSize;
     data->dictionarySize++;
 }
 
@@ -51,10 +53,10 @@ void initDictionary(lzwDecompData* data)
 
     for (int i = 0; i < 256; i++)
     {
-        data->dictionary[i] = calloc(2, sizeof(unsigned char));
-        snprintf(data->dictionary[i],2, "%c", i);
+        data->dictionary[i] = calloc(1, sizeof(unsigned char));
+        *(data->dictionary[i]) = (char)i;
+        //snprintf(data->dictionary[i],2, "%c", i);
         data->dictionaryEntrySize[i] = 1;
-
     }
 }
 
@@ -106,7 +108,6 @@ int readCodeEntry(FILE* source, lzwDecompData *data)
     {
         freadVal = fread(data->buffer, 1, 3, source);
 
-
         /* Read 3 bytes for the first code entry*/
         if (freadVal == 3)
         {
@@ -143,15 +144,19 @@ int decompress (lzwDecompData* data, FILE* source, FILE* dest)
     */
     initDictionary(data);
     int oldCode, newCode;
-    char* oldPhrase, *newPhrase;
+    phrase oldPhrase, newPhrase;
 
     /* Read in the first code */
     oldCode = readCodeEntry(source, data);
-    size_t size =data->dictionaryEntrySize[oldCode];
-    oldPhrase = calloc(size + 1, sizeof(char));
-
-    memcpy(oldPhrase, data->dictionary[oldCode], size+1);
-    fprintf(dest, "%s", oldPhrase);
+    size_t size = data->dictionaryEntrySize[oldCode];
+    oldPhrase.size = size;
+    oldPhrase.buffer = calloc(oldPhrase.size, sizeof(char)); // one for null byte
+    memcpy(oldPhrase.buffer, data->dictionary[oldCode],  oldPhrase.size);
+    
+    /*TODO: change to buffered write */
+    fwrite(oldPhrase.buffer, sizeof(char), oldPhrase.size, dest);
+    /* As we need to initialise newPhrase */
+    newPhrase = oldPhrase;
 
     /* While there is data to read */
     while ((newCode = readCodeEntry(source, data)))
@@ -162,16 +167,27 @@ int decompress (lzwDecompData* data, FILE* source, FILE* dest)
         if (data->dictionary[newCode] != NULL)
         {
             size = data->dictionaryEntrySize[newCode];
-            newPhrase = calloc(size + 1, sizeof(char));
-            memcpy(newPhrase, data->dictionary[newCode], size+1);
-            fprintf(dest, "%s", newPhrase);
-            addToDictionary(data,strncat((char*)oldPhrase, (char*)newPhrase, 1));
+            newPhrase.size = size;
+            newPhrase.buffer = calloc(size + 1, sizeof(char)); // For chars + null byte
+            memcpy(newPhrase.buffer, data->dictionary[newCode], (size));
+            fwrite(newPhrase.buffer, sizeof(char), newPhrase.size, dest);
+
+            /* Extra memory for the new char */
+            oldPhrase.buffer = realloc(oldPhrase.buffer, oldPhrase.size + 1);
+            memcpy(oldPhrase.buffer + (oldPhrase.size), newPhrase.buffer, 1);
+            oldPhrase.size += 1;
+            
+            addToDictionary(data, oldPhrase.buffer , oldPhrase.size);
 
         } else /* code is outside the dictionary */
         {
-            if (newCode == data->dictionarySize)
+            if (newCode >= data->dictionarySize)
             {
-                addToDictionary(data,strncat((char*)oldPhrase, (char*)oldPhrase, 1));
+                /* Extra memory for the new char */
+                oldPhrase.buffer = realloc(oldPhrase.buffer, oldPhrase.size + 1);
+                oldPhrase.size += 1;
+                memcpy(oldPhrase.buffer + (oldPhrase.size), oldPhrase.buffer, 1);
+                addToDictionary(data,oldPhrase.buffer, oldPhrase.size);
             }
             /*Some error*/
             else
