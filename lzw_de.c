@@ -5,22 +5,20 @@
  *  Sources: http://www.stringology.org/DataCompression/lzw-d/index_en.html and stackexchange
  */
 
-#include "lzw.h"
+#include "lzw_de.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 
-#define BUFFSIZE 1024
-
-
 void addToDictionary(lzwDecompData* data, char *inputStr, size_t strSize)
 {
     /* Add string to lzwDecompdata structure
-     *  Args: lzwDecompData data structure and String inputStr and strSize
+     *  Args: lzwDecompData data structure and String inputStr
      *  Returns:void
      */
-    data->dictionary[ data->dictionarySize] = inputStr;
+    size_t size = data->dictionarySize;
+    data->dictionary[size] = inputStr;
     data->dictionaryEntrySize[ data->dictionarySize] = strSize;
     data->dictionarySize++;
 }
@@ -106,7 +104,7 @@ int readCodeEntry(FILE* source, lzwDecompData *data)
     if (data->firstCode == true)
     {
         freadVal = fread(data->buffer, 1, 3, source);
-
+        
         /* Read 3 bytes for the first code entry*/
         if (freadVal == 3)
         {
@@ -144,7 +142,7 @@ int decompress (lzwDecompData* data, FILE* source, FILE* dest)
     initDictionary(data);
     int oldCode, newCode;
     phrase oldPhrase, newPhrase;
-
+    
     /* Read in the first code */
     oldCode = readCodeEntry(source, data);
     size_t size = data->dictionaryEntrySize[oldCode];
@@ -155,7 +153,7 @@ int decompress (lzwDecompData* data, FILE* source, FILE* dest)
     fwrite(oldPhrase.buffer, sizeof(char), oldPhrase.size, dest);
     /* As we need to initialise newPhrase */
     newPhrase = oldPhrase;
-
+    
     /* While there is data to read */
     while ((newCode = readCodeEntry(source, data)))
     {
@@ -166,26 +164,30 @@ int decompress (lzwDecompData* data, FILE* source, FILE* dest)
         {
             size = data->dictionaryEntrySize[newCode];
             newPhrase.size = size;
-            newPhrase.buffer = calloc(size + 1, sizeof(char)); // For chars + null byte
+            newPhrase.buffer = calloc(size, sizeof(char));
             memcpy(newPhrase.buffer, data->dictionary[newCode], (size));
             fwrite(newPhrase.buffer, sizeof(char), newPhrase.size, dest);
-
-            /* Extra memory for the new char */
+            
+            /* Extra memory for the new char, copy the first char from the new phrase*/
             oldPhrase.buffer = realloc(oldPhrase.buffer, oldPhrase.size + 1);
             memcpy(oldPhrase.buffer + (oldPhrase.size), newPhrase.buffer, 1);
             oldPhrase.size += 1;
             
+            /* We don't need to free the oldPhrase.buffer as its now been passed to the dictionary */
             addToDictionary(data, oldPhrase.buffer , oldPhrase.size);
-
+            
         } else /* code is outside the dictionary */
         {
-            if (newCode >= data->dictionarySize)
+            if (newCode == data->dictionarySize)
             {
-                /* Extra memory for the new char */
-                oldPhrase.buffer = realloc(oldPhrase.buffer, oldPhrase.size + 1);
-                oldPhrase.size += 1;
-                memcpy(oldPhrase.buffer + (oldPhrase.size), oldPhrase.buffer, 1);
-                addToDictionary(data,oldPhrase.buffer, oldPhrase.size);
+                /* Extra memory for the new char, note had issues using realloc with oldPhrase
+                 * Hence the temp use of a new array
+                 */
+                char* temp = calloc(oldPhrase.size + 1, sizeof(char));
+                memcpy(temp, oldPhrase.buffer, oldPhrase.size);
+                memcpy(temp + (oldPhrase.size), oldPhrase.buffer, 1);
+                /* We don't need to free the oldPhrase.buffer as its now been passed to the dictionary */
+                addToDictionary(data, temp, oldPhrase.size+1);
             }
             /*Some error*/
             else
@@ -210,4 +212,3 @@ int decompress (lzwDecompData* data, FILE* source, FILE* dest)
     
     return 0;
 }
-

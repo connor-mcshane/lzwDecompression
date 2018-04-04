@@ -21,15 +21,6 @@ typedef struct
     size_t dictionaryEntrySize[4096];
 } lzwDecompData;
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-/*
- *  phrase struct to keep track of phrase size
- */
-=======
->>>>>>> abb7d7995ea749de18cdfd6312dcd3344d1a85c5
-=======
->>>>>>> abb7d7995ea749de18cdfd6312dcd3344d1a85c5
 typedef struct
 {
     char *buffer;
