@@ -6,7 +6,7 @@
  */
 
 #include "lzw_com.h"
-#include "lzw_decom.h"
+#include "lzw_de.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
