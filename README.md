@@ -14,6 +14,6 @@
 ``` >> ./demoDecompLzw compressedfile1.z output.txt ```
 
 ### Further Work
-- Implementation of LZW compressor
-- Implement custom memory management for dictionary and phrases
+- Implement custom memory pools, to reduce malloc calls.
+- Use a output buffer for the file writes.
 
